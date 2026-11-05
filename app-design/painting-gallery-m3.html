@@ -349,8 +349,8 @@
 
   /* ============ 云端保存配置（Supabase） ============ */
   const CLOUD = {
-    url: '',        // 例：https://abcd1234.supabase.co
-    anonKey: '',    // 项目设置 → API → anon public key
+    url: 'https://jsybxkgpjsmcjrdtvype.supabase.co',
+    anonKey: 'sb_publishable_tNQsY2ljBmpSHmmTm-HriA_vABAbkJJ',
     bucket: 'artworks',
     table: 'works'
   };
@@ -648,8 +648,7 @@
     const upRes = await fetch(CLOUD.url + '/storage/v1/object/' + CLOUD.bucket + '/' + encodeURIComponent(path), {
       method: 'POST',
       headers: cloudHeaders({
-        'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'true'
+        'Content-Type': file.type || 'application/octet-stream'
       }),
       body: file
     });
