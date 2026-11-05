@@ -349,8 +349,8 @@
 
   /* ============ 云端保存配置（Supabase） ============ */
   const CLOUD = {
-    url: '',        // 例：https://abcd1234.supabase.co
-    anonKey: '',    // 项目设置 → API → anon public key
+    url: 'https://jsybxkgpjsmcjrdtvype.supabase.co',
+    anonKey: 'sb_publishable_tNQsY2ljBmpSHmmTm-HriA_vABAbkJJ',
     bucket: 'artworks',
     table: 'works'
   };
@@ -554,7 +554,12 @@
     Array.prototype.forEach.call(e.target.files, function (file) {
       if (cloudReady) {
         uploadFile(file).catch(function (err) {
-          toast('上传失败：' + err.message, '', null);
+          if (err instanceof TypeError) {
+            console.error('[cloud] 上传请求失败', err);
+            toast('上传失败：网络被中断，按 F12 查看 Console 里 [cloud] 开头的日志', '', null);
+          } else {
+            toast('上传失败：' + err.message, '', null);
+          }
         });
         return;
       }
@@ -648,8 +653,7 @@
     const upRes = await fetch(CLOUD.url + '/storage/v1/object/' + CLOUD.bucket + '/' + encodeURIComponent(path), {
       method: 'POST',
       headers: cloudHeaders({
-        'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'true'
+        'Content-Type': file.type || 'application/octet-stream'
       }),
       body: file
     });
