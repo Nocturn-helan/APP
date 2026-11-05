@@ -554,7 +554,12 @@
     Array.prototype.forEach.call(e.target.files, function (file) {
       if (cloudReady) {
         uploadFile(file).catch(function (err) {
-          toast('上传失败：' + err.message, '', null);
+          if (err instanceof TypeError) {
+            console.error('[cloud] 上传请求失败', err);
+            toast('上传失败：网络被中断，按 F12 查看 Console 里 [cloud] 开头的日志', '', null);
+          } else {
+            toast('上传失败：' + err.message, '', null);
+          }
         });
         return;
       }
@@ -701,7 +706,7 @@
       method: 'DELETE',
       headers: cloudHeaders({ Prefer: 'return=minimal' })
     }).catch(function () {});
-  }//
+  }
 
   async function restoreCloud(work) {
     try {
