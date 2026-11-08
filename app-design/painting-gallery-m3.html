@@ -132,6 +132,23 @@
   .empty.show { display: flex; }
   .empty-title { font-size: 15px; font-weight: 600; color: var(--on-surface); }
 
+  .net-banner {
+    display: none; align-items: center; gap: 10px;
+    margin: 8px 16px 0; padding: 10px 12px; border-radius: 14px;
+    background: rgba(255, 255, 255, .86);
+    box-shadow: inset 0 0 0 1.5px rgba(180, 72, 118, .26);
+    color: var(--danger); font-size: 12px; line-height: 17px;
+  }
+  .net-banner.show { display: flex; }
+  .net-banner-text { flex: 1; min-width: 0; }
+  .net-banner button {
+    flex-shrink: 0; border: none; cursor: pointer; font-family: inherit;
+    padding: 6px 14px; border-radius: 999px;
+    background: linear-gradient(135deg, #F177AE, #A87BE8 55%, #6F9BF2);
+    color: #fff; font-size: 12px; font-weight: 600;
+  }
+  .net-banner button:disabled { opacity: .55; cursor: default; }
+
   .home-bottom {
     padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
     background: rgba(253, 251, 255, .82);
@@ -271,6 +288,11 @@
       </button>
     </header>
 
+    <div class="net-banner" id="net-banner" role="alert">
+      <span class="net-banner-text" id="net-banner-text">本机存储读取失败，作品未能加载</span>
+      <button id="net-retry" type="button">重试</button>
+    </div>
+
     <main class="feed">
       <div class="columns" id="columns">
         <div class="col"></div>
@@ -347,14 +369,79 @@
 <script>
   const IMG = 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt={p}&image_size={s}';
 
-  /* ============ 云端保存配置（Supabase） ============ */
-  const CLOUD = {
-    url: 'https://jsybxkgpjsmcjrdtvype.supabase.co',
-    anonKey: 'sb_publishable_tNQsY2ljBmpSHmmTm-HriA_vABAbkJJ',
-    bucket: 'artworks',
-    table: 'works'
-  };
-  const cloudReady = /^https?:\/\//.test(CLOUD.url) && CLOUD.anonKey.length > 20;
+  /* ============ 本机持久化（IndexedDB） ============ */
+  const DB_NAME = 'painting-gallery';
+  const STORE = 'works';
+  let dbPromise = null;
+
+  function openDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+    return dbPromise;
+  }
+
+  function idbAdd(record) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).add(record);
+        req.onsuccess = function () { resolve(req.result); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function idbPut(record) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(record);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function idbGet(id) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
+
+  function idbDelete(id) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function idbAll() {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
 
 
   // 作品数据（演示内容）
@@ -401,12 +488,32 @@
     }
   ];
 
-  let nextId = works.length + 1;
   let currentId = null;
 
   const columns = document.getElementById('columns');
   const emptyState = document.getElementById('empty');
   const searchInput = document.getElementById('search-input');
+  const netBanner = document.getElementById('net-banner');
+  const netBannerText = document.getElementById('net-banner-text');
+  const netRetry = document.getElementById('net-retry');
+
+  function showNetBanner(message) {
+    netBannerText.textContent = message;
+    netBanner.classList.add('show');
+  }
+
+  function hideNetBanner() {
+    netBanner.classList.remove('show');
+  }
+
+  netRetry.addEventListener('click', function () {
+    netRetry.disabled = true;
+    netRetry.textContent = '加载中';
+    loadLocalWorks().then(function () {
+      netRetry.disabled = false;
+      netRetry.textContent = '重试';
+    });
+  });
 
   function go(name) {
     document.querySelectorAll('.page').forEach(function (p) {
@@ -475,7 +582,7 @@
 
     currentId = id;
     work.views += 1;
-    saveCloud(work, { views: work.views });
+    saveLocal(work, { views: work.views });
 
     document.getElementById('detail-img').src = work.src;
     document.getElementById('detail-img').alt = work.title;
@@ -533,13 +640,13 @@
     if (index === -1) return;
 
     const removed = works.splice(index, 1)[0];
-    if (cloudReady && removed.dbId) deleteCloudRow(removed);
+    if (removed.localId) removed.deletePromise = deleteLocal(removed);
     render();
     go('page-home');
     toast('已删除「' + removed.title + '」', '撤销', function () {
       works.splice(index, 0, removed);
       render();
-      if (cloudReady && removed.dbId) restoreCloud(removed);
+      if (removed.localId) restoreLocal(removed);
     });
   });
 
@@ -549,59 +656,16 @@
     fileInput.click();
   });
 
-  let warnedLocal = false;
   fileInput.addEventListener('change', function (e) {
     Array.prototype.forEach.call(e.target.files, function (file) {
-      if (cloudReady) {
-        uploadFile(file).catch(function (err) {
-          if (err instanceof TypeError) {
-            console.error('[cloud] 上传请求失败', err);
-            toast('上传失败：网络被中断，按 F12 查看 Console 里 [cloud] 开头的日志', '', null);
-          } else {
-            toast('上传失败：' + err.message, '', null);
-          }
-        });
-        return;
-      }
-      const url = URL.createObjectURL(file);
-      const title = file.name.replace(/\.[^.]+$/, '') || '我的作品';
-      fileRatio(file).then(function (ratio) {
-        addWork({ title: title, ratio: ratio, src: url, views: 0, desc: '' });
-        if (!warnedLocal) {
-          warnedLocal = true;
-          toast('未配置云存储，图片仅本次会话有效', '', null);
-        }
+      uploadFile(file).catch(function (err) {
+        toast('保存失败：' + (err && err.message ? err.message : '本机存储不可用'), '', null);
       });
     });
     fileInput.value = '';
   });
 
-  function addWork(data) {
-    const work = {
-      id: nextId++,
-      title: data.title,
-      views: data.views || 0,
-      desc: data.desc || '',
-      ratio: data.ratio,
-      src: data.src
-    };
-    works.unshift(work);
-    searchInput.value = '';
-    render();
-    document.querySelector('.feed').scrollTop = 0;
-  }
-
-  /* ============ 云端保存（Supabase REST） ============ */
-  function cloudHeaders(extra) {
-    return Object.assign({
-      apikey: CLOUD.anonKey,
-      Authorization: 'Bearer ' + CLOUD.anonKey
-    }, extra || {});
-  }
-
-  function cloudMessage(res, body) {
-    return (body || '').replace(/[{}"]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 70) || ('HTTP ' + res.status);
-  }
+  /* ============ 本机持久化（IndexedDB 存取） ============ */
 
   function fileRatio(file) {
     return new Promise(function (resolve) {
@@ -619,112 +683,94 @@
     });
   }
 
-  async function loadCloudWorks() {
-    if (!cloudReady) return;
+  async function loadLocalWorks() {
     try {
-      const res = await fetch(CLOUD.url + '/rest/v1/' + CLOUD.table + '?select=*&order=created_at.desc', { headers: cloudHeaders() });
-      if (!res.ok) throw new Error(cloudMessage(res, await res.text()));
-      const rows = await res.json();
-      const items = rows.map(function (row) {
-        return {
-          id: 'db-' + row.id,
-          dbId: row.id,
-          dbPath: row.image_path || '',
-          title: row.title || '未命名作品',
-          views: row.views || 0,
-          desc: row.description || '',
-          ratio: row.ratio || '4 / 3',
-          src: row.image_url
-        };
-      });
+      const rows = await idbAll();
+      const known = {};
+      works.forEach(function (w) { if (w.localId) known[w.localId] = true; });
+      const items = rows
+        .filter(function (row) { return !known[row.id]; })
+        .sort(function (a, b) { return b.createdAt - a.createdAt; })
+        .map(function (row) {
+          return {
+            id: 'local-' + row.id,
+            localId: row.id,
+            title: row.title || '未命名作品',
+            views: row.views || 0,
+            desc: row.desc || '',
+            ratio: row.ratio || '4 / 3',
+            src: URL.createObjectURL(row.blob)
+          };
+        });
       works.unshift.apply(works, items);
+      hideNetBanner();
       render();
     } catch (err) {
-      toast('云端作品加载失败：' + err.message, '', null);
+      showNetBanner('本机存储读取失败：' + (err && err.message ? err.message : '未知原因'));
     }
   }
 
   async function uploadFile(file) {
     const title = file.name.replace(/\.[^.]+$/, '') || '我的作品';
     const ratio = await fileRatio(file);
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-
-    const upRes = await fetch(CLOUD.url + '/storage/v1/object/' + CLOUD.bucket + '/' + encodeURIComponent(path), {
-      method: 'POST',
-      headers: cloudHeaders({
-        'Content-Type': file.type || 'application/octet-stream'
-      }),
-      body: file
+    const localId = await idbAdd({
+      title: title,
+      desc: '',
+      views: 0,
+      ratio: ratio,
+      blob: file,
+      createdAt: Date.now()
     });
-    if (!upRes.ok) throw new Error(cloudMessage(upRes, await upRes.text()));
-
-    const imageUrl = CLOUD.url + '/storage/v1/object/public/' + CLOUD.bucket + '/' + encodeURIComponent(path);
-    const rowRes = await fetch(CLOUD.url + '/rest/v1/' + CLOUD.table, {
-      method: 'POST',
-      headers: cloudHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-      body: JSON.stringify([{
-        title: title, description: '', views: 0,
-        ratio: ratio, image_url: imageUrl, image_path: path
-      }])
-    });
-    if (!rowRes.ok) throw new Error(cloudMessage(rowRes, await rowRes.text()));
-    const row = (await rowRes.json())[0];
-
     works.unshift({
-      id: 'db-' + row.id, dbId: row.id, dbPath: path,
-      title: row.title || title, views: row.views || 0, desc: row.description || '',
-      ratio: row.ratio || ratio, src: row.image_url || imageUrl
+      id: 'local-' + localId,
+      localId: localId,
+      title: title,
+      views: 0,
+      desc: '',
+      ratio: ratio,
+      src: URL.createObjectURL(file)
     });
     searchInput.value = '';
     render();
     document.querySelector('.feed').scrollTop = 0;
-    toast('已保存到云端「' + title + '」', '', null);
+    toast('已保存到本机「' + title + '」', '', null);
   }
 
-  function saveCloud(work, patch) {
-    if (!cloudReady || !work.dbId) return;
-    fetch(CLOUD.url + '/rest/v1/' + CLOUD.table + '?id=eq.' + work.dbId, {
-      method: 'PATCH',
-      headers: cloudHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-      body: JSON.stringify(patch)
+  function saveLocal(work, patch) {
+    if (!work.localId) return;
+    idbGet(work.localId).then(function (row) {
+      if (!row) return;
+      if (patch.title !== undefined) row.title = patch.title;
+      if (patch.description !== undefined) row.desc = patch.description;
+      if (patch.views !== undefined) row.views = patch.views;
+      return idbPut(row);
     }).catch(function () {});
   }
 
   const saveTimers = {};
   function scheduleSave(work, patch) {
-    if (!work.dbId) return;
+    if (!work.localId) return;
     clearTimeout(saveTimers[work.id]);
     saveTimers[work.id] = setTimeout(function () {
-      saveCloud(work, patch);
+      saveLocal(work, patch);
     }, 700);
   }
 
-  function deleteCloudRow(work) {
-    // 只删数据库记录，保留存储文件，撤销时可恢复
-    fetch(CLOUD.url + '/rest/v1/' + CLOUD.table + '?id=eq.' + work.dbId, {
-      method: 'DELETE',
-      headers: cloudHeaders({ Prefer: 'return=minimal' })
-    }).catch(function () {});
+  function deleteLocal(work) {
+    return idbGet(work.localId).then(function (row) {
+      if (!row) return;
+      work.record = row;
+      return idbDelete(work.localId);
+    });
   }
 
-  async function restoreCloud(work) {
+  async function restoreLocal(work) {
     try {
-      const res = await fetch(CLOUD.url + '/rest/v1/' + CLOUD.table, {
-        method: 'POST',
-        headers: cloudHeaders({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-        body: JSON.stringify([{
-          title: work.title, description: work.desc || '', views: work.views || 0,
-          ratio: work.ratio, image_url: work.src, image_path: work.dbPath || ''
-        }])
-      });
-      if (!res.ok) throw new Error(cloudMessage(res, await res.text()));
-      const row = (await res.json())[0];
-      work.dbId = row.id;
-      work.id = 'db-' + row.id;
+      if (work.deletePromise) await work.deletePromise;
+      if (work.record) await idbPut(work.record);
       render();
     } catch (err) {
-      toast('撤销失败：云端记录未恢复', '', null);
+      toast('撤销失败：本机记录未恢复', '', null);
     }
   }
 
@@ -766,7 +812,7 @@
   }, 1000);
 
   render();
-  loadCloudWorks();
+  loadLocalWorks();
 </script>
 </body>
 </html>
