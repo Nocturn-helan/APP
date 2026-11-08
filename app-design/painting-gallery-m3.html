@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>绘画作品集 · Material 3</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -252,6 +252,17 @@
   .snackbar-action {
     border: none; background: transparent; color: #FFCFE6;
     font: inherit; font-size: 13px; font-weight: 700; letter-spacing: .5px; cursor: pointer;
+  }
+
+  /* ---------------- 真机（窄屏）适配 ---------------- */
+  @media (max-width: 480px) {
+    body { display: block; padding: 0; overflow: hidden; }
+    .phone {
+      width: 100%; height: 100vh; height: 100dvh;
+      border-radius: 0; box-shadow: none;
+    }
+    .caption { display: none; }
+    .snackbar { bottom: calc(88px + env(safe-area-inset-bottom)); }
   }
 </style>
 </head>
