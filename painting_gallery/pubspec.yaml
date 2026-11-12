@@ -1,0 +1,29 @@
+name: painting_gallery
+description: 绘画作品集 · Flutter 版（作品保存在本机，无需后端）
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  # 从系统相册选择作品图片
+  image_picker: ^1.1.2
+  # 获取应用本机目录，用于保存图片与作品信息
+  path_provider: ^2.1.4
+  # path_provider_android 2.3.x 改用 JNI，需要 NDK 参与原生编译；
+  # 固定到 2.2.x 保持纯平台通道实现，避免额外依赖 NDK
+  path_provider_android: ">=2.2.5 <2.3.0"
+  # 把作品图片保存到系统相册（详情页「下载图片」）
+  gal: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
