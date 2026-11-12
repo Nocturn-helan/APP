@@ -59,14 +59,14 @@
     background: var(--grad-splash);
     align-items: center; justify-content: center; gap: 18px;
   }
-  .bow { animation: bowIn .8s cubic-bezier(.2, .8, .2, 1) both; }
+  .bow { animation: bowIn 1s cubic-bezier(.16, 1, .3, 1) both; }
   @keyframes bowIn {
-    from { opacity: 0; transform: scale(.86); }
-    to   { opacity: 1; transform: scale(1); }
+    from { opacity: 0; transform: scale(.3); filter: blur(12px); }
+    to   { opacity: 1; transform: scale(1); filter: blur(0); }
   }
   .splash-caption {
     font-size: 14px; letter-spacing: 6px; color: #4C3C63;
-    animation: fadeUp .8s .18s ease both;
+    animation: fadeUp 1s .2s ease both;
   }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(6px); }
@@ -127,10 +127,11 @@
 
   .empty {
     display: none; flex-direction: column; align-items: center; gap: 6px;
-    padding: 72px 24px; text-align: center; color: var(--on-surface-variant);
+    flex: 1; justify-content: center; padding: 72px 24px; text-align: center;
+    color: #FFFFFF;
   }
   .empty.show { display: flex; }
-  .empty-title { font-size: 15px; font-weight: 600; color: var(--on-surface); }
+  .empty-title { font-size: 12px; font-weight: 500; color: #FFFFFF; letter-spacing: .3px; }
 
   .net-banner {
     display: none; align-items: center; gap: 10px;
@@ -237,6 +238,90 @@
     box-shadow: inset 0 0 0 1.5px var(--danger);
   }
 
+  /* ---------------- 删除确认弹窗 ---------------- */
+  .confirm-mask {
+    position: absolute; inset: 0;
+    background: rgba(36, 30, 44, .45);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s ease;
+    z-index: 20;
+  }
+  .confirm-mask.show { opacity: 1; pointer-events: auto; }
+  .confirm-dialog {
+    width: 86%; max-width: 300px;
+    background: #FFFFFF; border-radius: 22px;
+    padding: 24px 22px 18px;
+    box-shadow: 0 12px 40px rgba(80, 50, 120, .28);
+    opacity: 0; transform: scale(.92) translateY(8px);
+    transition: opacity .24s ease, transform .24s cubic-bezier(.2, .8, .2, 1);
+  }
+  .confirm-mask.show .confirm-dialog { opacity: 1; transform: none; }
+  .confirm-title {
+    font-size: 16px; font-weight: 700; color: var(--on-surface);
+    margin-bottom: 8px; text-align: center;
+  }
+  .confirm-text {
+    font-size: 13px; color: var(--on-surface-variant);
+    text-align: center; line-height: 20px; margin-bottom: 20px;
+  }
+  .confirm-actions {
+    display: flex; gap: 10px;
+  }
+  .confirm-actions .btn { flex: 1; height: 42px; border-radius: 21px; font-size: 13px; }
+  .btn-cancel {
+    background: var(--surface-container-high); color: var(--on-surface);
+    box-shadow: none;
+  }
+
+  /* ---------------- 图片飞走动画 ---------------- */
+  .hero.fly-away img {
+    animation: flyAway 1.5s cubic-bezier(.4, 0, .2, 1) forwards;
+    transform-origin: center bottom;
+  }
+  @keyframes flyAway {
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    30%  { transform: translateY(-60px) scale(1.02); opacity: 1; }
+    100% { transform: translateY(-600px) scale(.4); opacity: 0; filter: blur(3px); }
+  }
+
+  /* ---------------- 点赞按钮 ---------------- */
+  .btn-like {
+    flex: .9; background: linear-gradient(135deg, #FFE4EF, #FED4E4);
+    color: #D24A7A; position: relative; overflow: hidden;
+    box-shadow: inset 0 0 0 1.5px rgba(210, 74, 122, .28);
+  }
+  .btn-like svg { transition: none; }
+  .btn-like .heart-fill { display: none; }
+  .btn-like.liked {
+    background: linear-gradient(135deg, #F177AE, #E85C93);
+    color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(241, 119, 174, .35);
+  }
+  .btn-like.liked .heart-stroke { display: none; }
+  .btn-like.liked .heart-fill { display: inline; }
+
+  /* 爱心点击动画 */
+  .btn-like.animating svg {
+    animation: heartPop .8s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  @keyframes heartPop {
+    0%   { transform: scale(1); }
+    15%  { transform: scale(1.3); }
+    30%  { transform: scale(.85); }
+    45%  { transform: scale(1.1); }
+    60%  { transform: scale(.95); }
+    80%  { transform: scale(1.03); }
+    100% { transform: scale(1); }
+  }
+
+  /* 卡片点赞数 */
+  .card-likes {
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .card-likes svg { width: 11px; height: 11px; }
+
   /* ---------------- 提示条 ---------------- */
   .snackbar {
     position: absolute; left: 16px; right: 16px; bottom: 88px;
@@ -310,8 +395,7 @@
         <div class="col"></div>
       </div>
       <div class="empty" id="empty">
-        <span class="empty-title">没有找到作品</span>
-        <span>换个关键词试试</span>
+        <span class="empty-title">按 + 号开始展示自己的作品吧！</span>
       </div>
     </main>
 
@@ -363,6 +447,15 @@
 
     <footer class="detail-actions">
       <button id="download-btn" class="btn btn-tonal" type="button">下载图片</button>
+      <button id="like-btn" class="btn btn-like" type="button">
+        <svg class="heart-stroke" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <svg class="heart-fill" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span id="like-count">0</span>
+      </button>
       <button id="delete-btn" class="btn btn-danger" type="button">删除作品</button>
     </footer>
   </section>
@@ -371,6 +464,18 @@
   <div class="snackbar" id="snackbar">
     <span class="snackbar-text" id="snackbar-text"></span>
     <button class="snackbar-action" id="snackbar-action" type="button"></button>
+  </div>
+
+  <!-- ================= 删除确认弹窗 ================= -->
+  <div class="confirm-mask" id="confirm-mask">
+    <div class="confirm-dialog">
+      <div class="confirm-title">确认删除？</div>
+      <div class="confirm-text">删除后可以撤销操作，确定要移除这幅作品吗？</div>
+      <div class="confirm-actions">
+        <button class="btn btn-cancel" id="confirm-cancel" type="button">取消</button>
+        <button class="btn btn-danger" id="confirm-ok" type="button">删除</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -388,10 +493,10 @@
   function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = function () {
+      const req = indexedDB.open(DB_NAME, 2);
+      req.onupgradeneeded = function (e) {
         const db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) {
+        if (e.oldVersion < 1) {
           db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
         }
       };
@@ -455,49 +560,8 @@
   }
 
 
-  // 作品数据（演示内容）
-  const works = [
-    {
-      id: 1, title: '橘猫的午后', views: 326, ratio: '4 / 3',
-      desc: '午后三点的窗台，橘猫把自己摊成一块暖面包。水彩，2024 年春。',
-      src: IMG.replace('{p}', 'watercolor%20painting%20of%20an%20orange%20tabby%20cat%20napping%20on%20a%20sunlit%20windowsill%2C%20soft%20warm%20light%2C%20loose%20brushstrokes').replace('{s}', 'landscape_4_3')
-    },
-    {
-      id: 2, title: '夏日气泡', views: 241, ratio: '1 / 1',
-      desc: '泳池边的气泡，是夏天该有的颜色。',
-      src: IMG.replace('{p}', 'impressionist%20painting%20of%20summer%20bubbles%20floating%20above%20a%20turquoise%20pool%2C%20bright%20sunlight%2C%20pastel%20palette').replace('{s}', 'square')
-    },
-    {
-      id: 3, title: '蓝色清晨', views: 158, ratio: '3 / 4',
-      desc: '清晨湖面的蓝，层次很浅，像还没有醒透。',
-      src: IMG.replace('{p}', 'oil%20painting%20of%20a%20misty%20lake%20at%20dawn%2C%20cool%20blue%20tones%2C%20minimal%20composition').replace('{s}', 'portrait_4_3')
-    },
-    {
-      id: 4, title: '窗边的绿', views: 187, ratio: '4 / 5',
-      desc: '窗台上那盆绿萝，逆光时的轮廓最好看。',
-      src: IMG.replace('{p}', 'oil%20painting%20of%20green%20houseplants%20by%20a%20sunlit%20window%2C%20muted%20greens%2C%20morning%20light').replace('{s}', 'portrait_4_3')
-    },
-    {
-      id: 5, title: '旧书店', views: 92, ratio: '5 / 6',
-      desc: '老书店的木格窗与暖黄灯，记忆里的味道。',
-      src: IMG.replace('{p}', 'oil%20painting%20of%20an%20old%20bookstore%20interior%2C%20wooden%20shelves%2C%20warm%20amber%20lamplight%2C%20nostalgic%20mood').replace('{s}', 'portrait_4_3')
-    },
-    {
-      id: 6, title: '雨后街角', views: 73, ratio: '4 / 3',
-      desc: '雨后的柏油路，把路灯又画了一遍。',
-      src: IMG.replace('{p}', 'oil%20painting%20of%20a%20rainy%20street%20corner%20at%20dusk%2C%20wet%20pavement%20reflections%2C%20moody%20city%20lights').replace('{s}', 'landscape_4_3')
-    },
-    {
-      id: 7, title: '陶罐', views: 47, ratio: '3 / 4',
-      desc: '陶罐与木桌，土色系静物练习。',
-      src: IMG.replace('{p}', 'still%20life%20oil%20painting%20of%20a%20clay%20pot%20on%20a%20wooden%20table%2C%20earth%20tones%2C%20soft%20shadows').replace('{s}', 'portrait_4_3')
-    },
-    {
-      id: 8, title: '山脊线', views: 55, ratio: '16 / 9',
-      desc: '远处山脊一层层退去，最远的那层只剩雾。',
-      src: IMG.replace('{p}', 'oil%20painting%20of%20layered%20mountain%20ridges%20in%20mist%2C%20muted%20palette%2C%20distant%20peaks').replace('{s}', 'landscape_4_3')
-    }
-  ];
+  // 作品数据（初始为空，用户通过上传添加）
+  const works = [];
 
   let currentId = null;
 
@@ -560,8 +624,15 @@
       '<path d="M2 12 C6 5 18 5 22 12 C18 19 6 19 2 12 Z" /><circle cx="12" cy="12" r="3" /></svg>' +
       '<span>' + work.views + '</span>';
 
+    const likes = document.createElement('span');
+    likes.className = 'card-views card-likes';
+    likes.innerHTML = '<svg viewBox="0 0 24 24" fill="' + (work.liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2">' +
+      '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' +
+      '<span>' + (work.likes || 0) + '</span>';
+
     meta.appendChild(title);
     meta.appendChild(views);
+    meta.appendChild(likes);
     card.appendChild(thumb);
     card.appendChild(meta);
     card.addEventListener('click', function () { openDetail(work.id); });
@@ -601,11 +672,18 @@
     document.getElementById('detail-title').value = work.title;
     document.getElementById('detail-desc').value = work.desc || '';
 
+    // 点赞状态
+    const likeBtn = document.getElementById('like-btn');
+    likeBtn.classList.toggle('liked', !!work.liked);
+    document.getElementById('like-count').textContent = work.likes || 0;
+
     const card = document.querySelector('.card[data-id="' + id + '"]');
     if (card) {
       card.querySelector('.card-title').textContent = work.title;
       card.querySelector('.card-views span:last-child').textContent = work.views;
     }
+    // 重置 hero 飞走动画
+    document.getElementById('detail-img').parentElement.classList.remove('fly-away');
     go('page-detail');
   }
 
@@ -627,7 +705,49 @@
     }
   });
 
+  /* 删除 —— 二次确认 + 飞走动画 + 撤销 */
+  const confirmMask = document.getElementById('confirm-mask');
+  document.getElementById('delete-btn').addEventListener('click', function () {
+    confirmMask.classList.add('show');
+  });
+  document.getElementById('confirm-cancel').addEventListener('click', function () {
+    confirmMask.classList.remove('show');
+  });
+  document.getElementById('confirm-ok').addEventListener('click', function () {
+    confirmMask.classList.remove('show');
+    doDeleteWithAnimation();
+  });
+
+  let deleteAnimTimer = null;
+  function doDeleteWithAnimation() {
+    const index = works.findIndex(function (w) { return w.id === currentId; });
+    if (index === -1) return;
+
+    const hero = document.getElementById('detail-img').parentElement;
+    hero.classList.add('fly-away');
+
+    // 1.5s 飞走动画后执行实际删除
+    deleteAnimTimer = setTimeout(function () {
+      deleteAnimTimer = null;
+      const removed = works.splice(index, 1)[0];
+      if (removed.localId) removed.deletePromise = deleteLocal(removed);
+      render();
+      go('page-home');
+      toast('已删除「' + removed.title + '」', '撤销', function () {
+        works.splice(index, 0, removed);
+        render();
+        if (removed.localId) restoreLocal(removed);
+      });
+    }, 1500);
+  }
+
+  /* 返回按钮也要清掉可能残留的飞走动画和定时器 */
   document.getElementById('back-btn').addEventListener('click', function () {
+    if (deleteAnimTimer) {
+      clearTimeout(deleteAnimTimer);
+      deleteAnimTimer = null;
+      document.getElementById('detail-img').parentElement.classList.remove('fly-away');
+    }
     render();
     go('page-home');
   });
@@ -645,20 +765,45 @@
     toast('已开始下载「' + (work.title || '作品') + '」', '', null);
   });
 
-  /* 删除（支持撤销） */
-  document.getElementById('delete-btn').addEventListener('click', function () {
-    const index = works.findIndex(function (w) { return w.id === currentId; });
-    if (index === -1) return;
+  /* 点赞按钮 */
+  const likeBtn = document.getElementById('like-btn');
+  let likeAnimTimer = null;
+  likeBtn.addEventListener('click', function () {
+    const work = works.find(function (w) { return w.id === currentId; });
+    if (!work) return;
 
-    const removed = works.splice(index, 1)[0];
-    if (removed.localId) removed.deletePromise = deleteLocal(removed);
-    render();
-    go('page-home');
-    toast('已删除「' + removed.title + '」', '撤销', function () {
-      works.splice(index, 0, removed);
-      render();
-      if (removed.localId) restoreLocal(removed);
-    });
+    // 切换 liked 状态
+    work.liked = !work.liked;
+    work.likes = (work.likes || 0) + (work.liked ? 1 : -1);
+    if (work.likes < 0) work.likes = 0;
+
+    // 按钮视觉状态
+    likeBtn.classList.toggle('liked', work.liked);
+    document.getElementById('like-count').textContent = work.likes;
+
+    // 爱心跳动动画
+    likeBtn.classList.remove('animating');
+    // 强制重排以重启动画
+    void likeBtn.offsetWidth;
+    likeBtn.classList.add('animating');
+    clearTimeout(likeAnimTimer);
+    likeAnimTimer = setTimeout(function () {
+      likeBtn.classList.remove('animating');
+    }, 800);
+
+    // 持久化
+    saveLocal(work, { likes: work.likes, liked: work.liked });
+
+    // 同步卡片上的点赞显示
+    const card = document.querySelector('.card[data-id="' + currentId + '"]');
+    if (card) {
+      const likesWrap = card.querySelector('.card-likes');
+      if (likesWrap) {
+        const svgEl = likesWrap.querySelector('svg');
+        if (svgEl) svgEl.setAttribute('fill', work.liked ? 'currentColor' : 'none');
+        likesWrap.querySelector('span').textContent = work.likes;
+      }
+    }
   });
 
   /* 上传 */
@@ -708,6 +853,8 @@
             localId: row.id,
             title: row.title || '未命名作品',
             views: row.views || 0,
+            likes: row.likes || 0,
+            liked: !!row.liked,
             desc: row.desc || '',
             ratio: row.ratio || '4 / 3',
             src: URL.createObjectURL(row.blob)
@@ -728,6 +875,8 @@
       title: title,
       desc: '',
       views: 0,
+      likes: 0,
+      liked: false,
       ratio: ratio,
       blob: file,
       createdAt: Date.now()
@@ -737,6 +886,8 @@
       localId: localId,
       title: title,
       views: 0,
+      likes: 0,
+      liked: false,
       desc: '',
       ratio: ratio,
       src: URL.createObjectURL(file)
@@ -754,6 +905,8 @@
       if (patch.title !== undefined) row.title = patch.title;
       if (patch.description !== undefined) row.desc = patch.description;
       if (patch.views !== undefined) row.views = patch.views;
+      if (patch.likes !== undefined) row.likes = patch.likes;
+      if (patch.liked !== undefined) row.liked = patch.liked;
       return idbPut(row);
     }).catch(function () {});
   }
@@ -816,11 +969,11 @@
     snackTimer = setTimeout(hideSnackbar, 3600);
   }
 
-  /* 启动页停留 1 秒进入首页 */
+  /* 启动页停留 2.5 秒进入首页（logo 动画 1s 已在 1s 时完成） */
   setTimeout(function () {
     render();
     go('page-home');
-  }, 1000);
+  }, 2500);
 
   render();
   loadLocalWorks();
