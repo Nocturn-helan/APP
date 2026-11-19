@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local release builds (upload via GitHub Release page instead)
+/releases/

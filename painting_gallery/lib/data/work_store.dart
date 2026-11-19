@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'album_store.dart';
 import '../models/work.dart';
 
 /// 本机作品仓库：图片存文件，作品信息存 JSON，替代原型里的 IndexedDB。
@@ -180,7 +181,7 @@ class WorkStore extends ChangeNotifier {
     _persistNow();
   }
 
-  /// 撤销超时后真正删除图片文件
+  /// 撤销超时后真正删除图片文件，并从所有相册里解除引用
   Future<void> purgeWork(Work work) async {
     final String path = imagePath(work);
     if (path.isNotEmpty) {
@@ -191,6 +192,8 @@ class WorkStore extends ChangeNotifier {
         // 文件已不存在时忽略
       }
     }
+    // 同步从所有相册里移除该作品
+    AlbumStore.instance.purgeWorkFromAllAlbums(work.id);
     _schedulePersist();
   }
 

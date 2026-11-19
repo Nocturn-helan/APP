@@ -82,24 +82,10 @@ class WorkCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    Row(
-                      children: <Widget>[
-                        Icon(
-                          work.liked ? Icons.favorite : Icons.favorite_border,
-                          size: 11,
-                          color: work.liked
-                              ? AppColors.like
-                              : AppColors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${work.likes}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                    Icon(
+                      work.liked ? Icons.favorite : Icons.favorite_border,
+                      size: 11,
+                      color: work.liked ? AppColors.like : AppColors.onSurfaceVariant,
                     ),
                   ],
                 ),

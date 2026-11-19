@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/album_store.dart';
 import '../data/work_store.dart';
 import '../models/work.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/work_card.dart';
+import 'albums_page.dart';
 import 'detail_page.dart';
 
 /// 首页：顶部搜索栏 + 双列瀑布流 + 底部上传入口。
@@ -18,11 +20,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final WorkStore _store = WorkStore.instance;
+  final AlbumStore _albumStore = AlbumStore.instance;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
 
   String _query = '';
   bool _picking = false;
+  int _currentTab = 0; // 0 = 首页瀑布流, 1 = 相册列表
+  int _filterMode = 0; // 0 = 全部, 1 = 未分类, 2 = 已分类
 
   @override
   void initState() {
@@ -49,18 +54,101 @@ class _HomePageState extends State<HomePage> {
         decoration: const BoxDecoration(gradient: AppGradients.page),
         child: SafeArea(
           child: AnimatedBuilder(
-            animation: _store,
+            animation: Listenable.merge(<Listenable>[_store, _albumStore]),
             builder: (BuildContext context, Widget? child) {
-              return Column(
+              return IndexedStack(
+                index: _currentTab,
                 children: <Widget>[
-                  _buildTopBar(),
-                  if (_store.loadFailed) _buildStorageBanner(),
-                  Expanded(child: _buildFeed()),
-                  _buildUploadBar(),
+                  _buildHomeTab(),
+                  const AlbumsPage(),
                 ],
               );
             },
           ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  /// Tab 0：首页内容（搜索栏 + 瀑布流 + 上传栏）
+  Widget _buildHomeTab() {
+    return Column(
+      children: <Widget>[
+        _buildTopBar(),
+        if (_store.loadFailed) _buildStorageBanner(),
+        Expanded(child: _buildFeed()),
+        _buildUploadBar(),
+      ],
+    );
+  }
+
+  /// 底部导航：首页 / 相册
+  Widget _buildBottomNav() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+      decoration: const BoxDecoration(
+        color: AppColors.page86,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.dividerShadow,
+            blurRadius: 1,
+            offset: Offset(0, -1),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: <Widget>[
+            Expanded(child: _buildTabButton(0, Icons.home, '首页')),
+            const SizedBox(width: 12),
+            Expanded(child: _buildTabButton(1, Icons.photo_library, '相册')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton(int index, IconData icon, String label) {
+    final bool selected = _currentTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentTab = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 48,
+        decoration: BoxDecoration(
+          gradient: selected ? AppGradients.button : null,
+          color: selected ? null : AppColors.surfaceContainer,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: selected
+              ? const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x528C64D2),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? Colors.white : AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -286,11 +374,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   List<Work> _visibleWorks() {
+    List<Work> list = List<Work>.of(_store.works);
+
+    // 分类筛选：只对首页（Tab 0）生效
+    if (_filterMode == 1) {
+      list = list
+          .where((Work w) => !_albumStore.isWorkCategorized(w.id))
+          .toList();
+    } else if (_filterMode == 2) {
+      list = list.where((Work w) => _albumStore.isWorkCategorized(w.id)).toList();
+    }
+
     final String query = _query.trim().toLowerCase();
-    if (query.isEmpty) return List<Work>.of(_store.works);
-    return _store.works
-        .where((Work work) => work.title.toLowerCase().contains(query))
-        .toList();
+    if (query.isNotEmpty) {
+      list = list
+          .where((Work work) => work.title.toLowerCase().contains(query))
+          .toList();
+    }
+    return list;
   }
 
   void _openDetail(Work work) {
@@ -355,17 +456,112 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onFilterTap() {
-    _showSnack('筛选功能将在后续版本接入');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Text(
+                  '筛选作品',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildFilterOption(0, Icons.all_inclusive, '全部作品'),
+                _buildFilterOption(1, Icons.inbox, '只看未分类'),
+                _buildFilterOption(2, Icons.check_circle_outline, '只看已分类'),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterOption(int mode, IconData icon, String label) {
+    final bool selected = _filterMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _filterMode = mode);
+        Navigator.of(context).pop();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryContainer : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: selected
+              ? Border.all(color: AppColors.primary, width: 1.5)
+              : null,
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 22,
+              color: selected ? AppColors.primary : AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: selected ? AppColors.primary : AppColors.onSurface,
+              ),
+            ),
+            const Spacer(),
+            if (selected)
+              const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: <Widget>[
+            Expanded(child: Text(message)),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+              onPressed: messenger.hideCurrentSnackBar,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
         ),
-      );
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+      ),
+    );
   }
 }

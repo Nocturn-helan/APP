@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../data/album_store.dart';
 import '../data/work_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bow_logo.dart';
@@ -29,8 +30,9 @@ class _SplashPageState extends State<SplashPage>
       duration: const Duration(milliseconds: 900),
     )..forward();
 
-    // 启动时就把本机作品读入内存，首页直接渲染
+    // 启动时就把本机作品与相册读入内存，首页直接渲染
     WorkStore.instance.load();
+    AlbumStore.instance.load();
 
     _timer = Timer(const Duration(milliseconds: 2500), _goHome);
   }

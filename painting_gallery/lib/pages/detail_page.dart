@@ -394,25 +394,11 @@ class _DetailPageState extends State<DetailPage>
                 ]
               : null,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(
-              liked ? Icons.favorite : Icons.favorite_border,
-              size: 18,
-              color: foreground,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              '${_work.likes}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: foreground,
-              ),
-            ),
-          ],
-        ),
+        child: Icon(
+            liked ? Icons.favorite : Icons.favorite_border,
+            size: 18,
+            color: foreground,
+          ),
       ),
     );
   }
@@ -500,8 +486,18 @@ class _DetailPageState extends State<DetailPage>
     final ScaffoldFeatureController<SnackBar, SnackBarClosedReason> controller =
         messenger.showSnackBar(
       SnackBar(
-        content: Text('已删除「${work.displayTitle}」'),
-        duration: const Duration(seconds: 4),
+        content: Row(
+          children: <Widget>[
+            Expanded(child: Text('已删除「${work.displayTitle}」')),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+              onPressed: messenger.hideCurrentSnackBar,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
         action: SnackBarAction(
           label: '撤销',
@@ -610,13 +606,23 @@ class _DetailPageState extends State<DetailPage>
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: <Widget>[
+            Expanded(child: Text(message)),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+              onPressed: messenger.hideCurrentSnackBar,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
         ),
-      );
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+      ),
+    );
   }
 }
